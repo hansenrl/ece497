@@ -3,7 +3,7 @@
  */
 
 // Modfied for ALSA output 5-May-2011, Mark A. Yoder
-
+// Modified by Ross Hansen for ECE497 onn 9/16/2012
 // Based on Basic PCM audio (http://www.suse.de/~mana/alsa090_howto.html#sect02)http://www.suse.de/~mana/alsa090_howto.html#sect03
 
 //* Standard Linux headers **
