@@ -97,7 +97,7 @@ void *audio_thread_fxn( void *envByRef )
     int   blksize = BLOCKSIZE;			// Raw input or output frame size in bytes
     char *outputBuffer = NULL;			// Output buffer for driver to read from
 
-    char replayBuffer[2048*BUFFER_MULT];
+    char *replayTempBuffer = NULL;
 
 // Thread Create Phase -- secure and initialize resources
 // ******************************************************
@@ -152,6 +152,14 @@ void *audio_thread_fxn( void *envByRef )
    sfifo_init(&replayRingBuff, blksize*BUFFER_MULT);
    memset(replayRingBuff.buffer, 0, replayRingBuff.size);
 
+    // Create output buffer to write from into ALSA output device
+    if( ( replayTempBuffer = malloc( blksize ) ) == NULL )
+    {
+        ERR( "Failed to allocate memory for replayTempBuffer (%d)\n", blksize );
+        status = AUDIO_THREAD_FAILURE;
+        goto  cleanup ;
+    }
+
 // Thread Execute Phase -- perform I/O and processing
 // **************************************************
     // Get things started by sending some silent buffers out.
@@ -174,12 +182,14 @@ void *audio_thread_fxn( void *envByRef )
     {
 
 	if(replayFlag == 1){ 	
-	    	for(j = 1; j < BUFFER_MULT; j++){
-			sfifo_read(&replayRingBuff, replayBuffer, blksize);
-			snd_pcm_writei(pcm_output_handle, replayBuffer, blksize/BYTESPERFRAME);
+	    	//for(j = 0; j < BUFFER_MULT; j++){
+		while(replayRingBuff.readpos < replayRingBuff.writepos){
+			sfifo_read(&replayRingBuff, replayTempBuffer, blksize);
+			snd_pcm_writei(pcm_output_handle, replayTempBuffer, blksize/BYTESPERFRAME);
 	    		//snd_pcm_writei(pcm_output_handle, j*2048+replayBuffer, blksize/BYTESPERFRAME);
 			snd_pcm_readi(pcm_capture_handle, outputBuffer, blksize/BYTESPERFRAME);
 		}
+		DBG("Readpos: %d, writepos: %d\n", replayRingBuff.readpos, replayRingBuff.writepos);
 		replayFlag = 0;
 		sfifo_flush(&replayRingBuff);
 		DBG("Replayed audio\n");
@@ -197,9 +207,9 @@ void *audio_thread_fxn( void *envByRef )
 		//if(replayCounter == BUFFER_MULT)
 		//	replayCounter = 0;
 		//memcpy(replayBuffer+2048*replayCounter, outputBuffer, 2048);
-		sfifo_write(&replayRingBuff, outputBuffer, blksize); 
+		
 		//replayCounter++;
-
+		sfifo_write(&replayRingBuff, outputBuffer, blksize); 
 		// Write buffer into ALSA output device
 	      while (snd_pcm_writei(pcm_output_handle, outputBuffer, blksize/BYTESPERFRAME) < 0) {
 		snd_pcm_prepare(pcm_output_handle);
@@ -210,6 +220,7 @@ void *audio_thread_fxn( void *envByRef )
 		    memset(outputBuffer, 0, blksize);		// Clear the buffer
 		    snd_pcm_writei(pcm_output_handle, outputBuffer, exact_bufsize);
 	      }
+
 	}
 	//DBG("%d, ", count++);
     }
@@ -249,6 +260,8 @@ cleanup:
     // **********************
 
     sfifo_close(&replayRingBuff);
+    free(replayTempBuffer);
+
     // Free output buffer
     if( initMask & OUTPUT_BUFFER_ALLOCATED )
     {

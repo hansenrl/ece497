@@ -28,8 +28,8 @@ echo $video_size > $fb2/virtual_size
 echo $video_size > $ovl1/output_size
 echo $video_size > $ovl2/output_size
 
-echo 0,0 > $ovl1/position
-echo 640,240 > $ovl2/position
+echo 0,100 > $ovl1/position
+echo 640,100 > $ovl2/position
 
 echo 255 > $ovl0/global_alpha
 echo 0   > $mgr0/alpha_blending_enabled
