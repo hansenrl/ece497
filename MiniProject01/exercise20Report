@@ -1,0 +1,20 @@
+The picture is put in the upper-left corner of the screen, along with a green box surrounding a red circle. At first I had not idea what that background was, but after experimenting with the positioning of things and reading the source it appears that it is the circuluar frame, which makes sense - although it is exactly the size of the image, so it really isn't a good frame..... In the transparent parts of the picture it just has black - not sure if that was intended or not.
+
+Part a questions:
+1. You can modify the application to make it semi-transparent by changing the 3rd argument to the setup function from 0x00 to something non-zero.
+2. You can modify the application to place the banner at the top of the screen by changing the 4th parameter to the place function - instead of 100, use 0.
+3. Debug: 
+real	0m0.174s
+user	0m0.125s
+sys	0m0.008s
+Release:
+real	0m0.114s
+user	0m0.063s
+sys	0m0.016s
+
+4. To make the blue rectangle, change the color passed to the circular frame function to be 0xa00000ff. Then, in video_osd_setup, change the color fill to 0x00ffff00 to make it yellow.
+
+5. In the function call to video_osd_setup, the memory address of osdFd is passed because to cleanup the application, osdFd is passed to a cleanup function, and so the setup function needs to modify the value at that memory address, not just use it locally.
+
+
+
