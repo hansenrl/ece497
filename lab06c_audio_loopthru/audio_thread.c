@@ -99,6 +99,7 @@ void *audio_thread_fxn( void *envByRef )
         status = AUDIO_THREAD_FAILURE;
         goto  cleanup ;
     }
+    DBG( "blksize = %d, exact_bufsize = %d\n", blksize, (int) exact_bufsize);
     if( audio_io_setup( &pcm_capture_handle, SOUND_DEVICE, SAMPLE_RATE, 
 			SND_PCM_STREAM_CAPTURE, &exact_bufsize) == AUDIO_FAILURE )
     {
