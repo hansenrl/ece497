@@ -93,9 +93,10 @@ int main(int argc, char *argv[])
 
     while(keepGoing) {
 	scanf("%c", &userInput);
-	if(userInput == 10) {
+	if(userInput == 'c') {
 	    printf("Success!\n");
 	    pthread_kill(videoThread, SIGUSR1);
+	    pthread_kill(audioThread, SIGUSR2);
 	}
     }
 

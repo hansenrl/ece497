@@ -15,6 +15,7 @@
 //#include     <linux/soundcard.h>                // Defines OSS driver functions
 #include     <string.h>                         // Defines memcpy
 #include     <alsa/asoundlib.h>			// ALSA includes
+#include     <signal.h>
 
 //* Application headers **
 #include     "debug.h"                          // DBG and ERR macros
@@ -39,6 +40,25 @@
 //*  Parameters for audio thread execution **
 #define     BLOCKSIZE        48000
 
+void (*pSigPrev)(int sig);
+char replayBuffer[2048*10];
+char replayCounter = 0;
+int   blksize = BLOCKSIZE;			// Raw input or output frame size in bytes
+
+
+snd_pcm_t	*pcm_output_handle;
+
+void audio_signal_handler(int sig) {
+    int i;
+    printf("Woohoo! Caught the signal in audio\n");
+
+    for(i = 1; i < 10; i++)
+    	snd_pcm_writei(pcm_output_handle, i*2048+replayBuffer, blksize/BYTESPERFRAME);
+
+
+    if( pSigPrev != NULL )
+        (*pSigPrev)( sig );
+}
 
 //*******************************************************************************
 //*  audio_thread_fxn                                                          **
@@ -55,6 +75,9 @@
 //*******************************************************************************
 void *audio_thread_fxn( void *envByRef )
 {
+
+   // setup signal handler
+   pSigPrev = signal( SIGUSR2, audio_signal_handler );
 
 // Variables and definitions
 // *************************
@@ -73,10 +96,9 @@ void *audio_thread_fxn( void *envByRef )
 
     // Input and output driver variables
 //    FILE	* inputFile = NULL;		// Input file pointer (i.e. handle)
-    snd_pcm_t	*pcm_output_handle, *pcm_capture_handle;		// Handle for the PCM device
+    snd_pcm_t	*pcm_capture_handle;		// Handle for the PCM device
     snd_pcm_uframes_t exact_bufsize;		// bufsize is in frames.  Each frame is 4 bytes
 
-    int   blksize = BLOCKSIZE;			// Raw input or output frame size in bytes
     char *outputBuffer = NULL;			// Output buffer for driver to read from
 
 // Thread Create Phase -- secure and initialize resources
@@ -169,6 +191,11 @@ void *audio_thread_fxn( void *envByRef )
 	    memset(outputBuffer, 0, blksize);		// Clear the buffer
 	    snd_pcm_writei(pcm_output_handle, outputBuffer, exact_bufsize);
       }
+	if(replayCounter == 10)
+		replayCounter = 0;
+	memcpy(replayBuffer+2048*replayCounter, outputBuffer, 2048);
+	replayCounter++;
+	
 	//DBG("%d, ", count++);
     }
     //DBG("\n");

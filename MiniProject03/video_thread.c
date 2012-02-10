@@ -55,7 +55,7 @@ char * displayTemp[614400]; //make this dynamic?
 int         captureSize = 0;	// Size of input frame (from inputFile)
 
 void video_signal_handler(int sig) {
-    printf("Woohoo! Caught the signal\n");
+    printf("Woohoo! Caught the signal in video\n");
     memcpy(displays2[0],displayTemp,captureSize);
 
     if( pSigPrev != NULL )

@@ -7,6 +7,10 @@
 
 video_size=640,480
 
+# echo 4000000 > /sys/class/graphics/fb2/size
+# echo 4000000 > /sys/class/graphics/fb1/size
+
+
 # Disable the overlays
 echo "0" > $ovl0/enabled
 echo "0" > $ovl1/enabled
