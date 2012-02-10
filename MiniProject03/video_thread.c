@@ -10,7 +10,8 @@
 #include     <linux/fb.h>                       // Defines framebuffer driver methods
 #include     <asm/types.h>                      // Standard typedefs required by v4l2 header
 #include     <linux/videodev2.h>                // v4l2 driver definitions
-#include     <unistd.h>
+//#include     <unistd.h>
+#include 	<signal.h>
 
 //* Application headers files **
 #include     "debug.h"                          // DBG and ERR macros
@@ -48,6 +49,19 @@
 //* Video capture and display devices used **
 #define     V4L2_DEVICE     "/dev/video0"
 
+void (*pSigPrev)(int sig);
+char * displays2[1];
+char * displayTemp[614400]; //make this dynamic?
+int         captureSize = 0;	// Size of input frame (from inputFile)
+
+void video_signal_handler(int sig) {
+    printf("Woohoo! Caught the signal\n");
+    memcpy(displays2[0],displayTemp,captureSize);
+
+    if( pSigPrev != NULL )
+        (*pSigPrev)( sig );
+}
+
 //*******************************************************************************
 //*  video_thread_fxn                                                          **
 //*******************************************************************************
@@ -74,6 +88,9 @@
 void *video_thread_fxn( void *envByRef )
 {
 
+   // setup signal handler
+   pSigPrev = signal( SIGUSR1, video_signal_handler );
+
 // Variables and definitions
 // *************************
 
@@ -99,7 +116,7 @@ void *video_thread_fxn( void *envByRef )
 
     unsigned  int *osdDisplay;	// OSD display buffer
 
-    int         captureSize = 0;	// Size of input frame (from inputFile)
+
     int		captureSizeOld = 0;	// Previous captureSize
 
     #define     PICTURE_WIDTH      640
@@ -109,7 +126,7 @@ void *video_thread_fxn( void *envByRef )
                                    * PICTURE_WIDTH ];
 
     char * displays[ NUM_DISP_BUFS ];	// Display frame pointers
-    char * displays2[1];
+
     int   displayWidth;			// Width of a display frame
     int   displayHeight;		// Height of a display frame
     int   displayBufSize = 0;		// Bytes in a display frame
@@ -276,9 +293,11 @@ void *video_thread_fxn( void *envByRef )
 	dst = displays[ workingIdx ];
 
 	memcpy(dst,vidBufs[ v4l2buf.index ].start,captureSize);
-	if(frameNumber % 20 == 0){
+	memcpy(displayTemp,vidBufs[ v4l2buf.index ].start,captureSize);
+
+	/*if(frameNumber % 20 == 0){
 		memcpy(displays2[0],vidBufs[v4l2buf.index].start,captureSize);
-	}
+	}*/
 
         // Calculate the next buffer for display/work
         displayIdx = ( displayIdx + 1 ) % NUM_DISP_BUFS;

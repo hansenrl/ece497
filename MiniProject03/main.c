@@ -23,6 +23,7 @@
 
 pthread_t audioThread, videoThread;
 void * audioThreadReturn, * videoThreadReturn;
+char	    keepGoing = 1;
 
 /* Global thread environments */
 video_thread_env video_env = {0};
@@ -34,6 +35,8 @@ void (*pSigPrev)(int sig);
 /* Callback called when SIGINT is sent to the process (Ctrl-C) */
 void signal_handler(int sig) {
     DBG( "Ctrl-C pressed, cleaning up and exiting..\n" );
+
+    keepGoing = 0;
 
     video_env.quit = 1;
 #ifdef _DEBUG_
@@ -57,6 +60,7 @@ int main(int argc, char *argv[])
 #define AUDIOTHREADCREATED      0x8
     unsigned int    initMask  = 0;
     int             status    = EXIT_SUCCESS;
+    char            userInput = NULL;
 
     void *videoThreadReturn;
 
@@ -86,6 +90,14 @@ int main(int argc, char *argv[])
 	goto cleanup;
     }
     initMask |= AUDIOTHREADCREATED;
+
+    while(keepGoing) {
+	scanf("%c", &userInput);
+	if(userInput == 10) {
+	    printf("Success!\n");
+	    pthread_kill(videoThread, SIGUSR1);
+	}
+    }
 
 cleanup:
     pthread_join(videoThread, (void **) &videoThreadReturn);
