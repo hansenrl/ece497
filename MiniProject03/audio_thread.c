@@ -150,8 +150,8 @@ void *audio_thread_fxn( void *envByRef )
 
    //initialize ring buffer for replay
    sfifo_init(&replayRingBuff, blksize*BUFFER_MULT);
-   memset(replayRingBuff.buffer, 0, replayRingBuff.size);
-
+   memset(replayRingBuff.buffer, 127, replayRingBuff.size);
+   sfifo_flush(&replayRingBuff);
     // Create output buffer to write from into ALSA output device
     if( ( replayTempBuffer = malloc( blksize ) ) == NULL )
     {
@@ -159,6 +159,8 @@ void *audio_thread_fxn( void *envByRef )
         status = AUDIO_THREAD_FAILURE;
         goto  cleanup ;
     }
+
+    memset(replayTempBuffer, 127, blksize);
 
 // Thread Execute Phase -- perform I/O and processing
 // **************************************************
@@ -178,10 +180,15 @@ void *audio_thread_fxn( void *envByRef )
     DBG( "Entering audio_thread_fxn processing loop\n" );
     int j;
     int count = 0;
+    int countSinceLastReplay = 0;
+
+    int replayCount = 0;
+    int originalWritePos = 0;
     while( !envPtr->quit )
     {
 
-	if(replayFlag == 1){ 	
+//	if(replayFlag == 1){ 
+	if(0){	
 	    	//for(j = 0; j < BUFFER_MULT; j++){
 		while(replayRingBuff.readpos < replayRingBuff.writepos){
 			sfifo_read(&replayRingBuff, replayTempBuffer, blksize);
@@ -204,12 +211,35 @@ void *audio_thread_fxn( void *envByRef )
 		    status = AUDIO_THREAD_FAILURE;
 		    goto  cleanup ;
 		}
-		//if(replayCounter == BUFFER_MULT)
-		//	replayCounter = 0;
+		if(replayFlag == 1){
+			if(replayCount == 0){
+				originalWritePos = replayRingBuff.writepos; // store original write position
+									// .....unused for now
+			} //else if(replayRingBuff.readpos >= originalWritePos - 1){
+			else if(replayCount == BUFFER_MULT || replayCount > countSinceLastReplay){
+				replayCount = 0;
+				replayFlag = 0;
+				sfifo_flush(&replayRingBuff);
+				//memset(replayRingBuff.buffer, 127, replayRingBuff.size);
+			} else {
+				sfifo_read(&replayRingBuff, replayTempBuffer, blksize);
+				for(j = 0; j < blksize; j++){
+					/*if(j % 500 == 0 && replayCount <= 30)
+						printf("%x %x    ", outputBuffer[j], replayTempBuffer[j]);*/
+					if(replayCount > 15)	// for some reason the first part of the buffer is corrupted
+						outputBuffer[j] += replayTempBuffer[j];
+					/*if(j % 500 == 0 && replayCount <= 30)
+						printf("%x %x\n", outputBuffer[j], replayTempBuffer[j]);*/
+				}
+				//DBG("Added to Buffer!");
+			}
+			replayCount++;
+		} else
+			sfifo_write(&replayRingBuff, outputBuffer, blksize); 
 		//memcpy(replayBuffer+2048*replayCounter, outputBuffer, 2048);
 		
 		//replayCounter++;
-		sfifo_write(&replayRingBuff, outputBuffer, blksize); 
+		//sfifo_write(&replayRingBuff, outputBuffer, blksize); 
 		// Write buffer into ALSA output device
 	      while (snd_pcm_writei(pcm_output_handle, outputBuffer, blksize/BYTESPERFRAME) < 0) {
 		snd_pcm_prepare(pcm_output_handle);
@@ -223,6 +253,7 @@ void *audio_thread_fxn( void *envByRef )
 
 	}
 	//DBG("%d, ", count++);
+	countSinceLastReplay++;
     }
     //DBG("\n");
 
