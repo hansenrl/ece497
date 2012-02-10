@@ -7,8 +7,8 @@
 
 video_size=640,480
 
-# echo 4000000 > /sys/class/graphics/fb2/size
-# echo 4000000 > /sys/class/graphics/fb1/size
+echo 4000000 > /sys/class/graphics/fb2/size
+#echo 4000000 > /sys/class/graphics/fb1/size
 
 
 # Disable the overlays

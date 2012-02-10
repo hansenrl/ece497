@@ -21,6 +21,7 @@
 #include     "debug.h"                          // DBG and ERR macros
 #include     "audio_thread.h"                   // Audio thread definitions
 #include     "audio_input_output.h"             // Audio driver input and output functions
+#include     "sfifo.h"
 
 /* Input audio file */
 #define     INPUTFILE        "/tmp/audio.raw"
@@ -40,21 +41,17 @@
 //*  Parameters for audio thread execution **
 #define     BLOCKSIZE        48000
 
+#define BUFFER_MULT 300//00
+
 void (*pSigPrev)(int sig);
-char replayBuffer[2048*10];
-char replayCounter = 0;
-int   blksize = BLOCKSIZE;			// Raw input or output frame size in bytes
+char replayFlag = 0;
 
-
+sfifo_t		replayRingBuff;
 snd_pcm_t	*pcm_output_handle;
 
 void audio_signal_handler(int sig) {
-    int i;
     printf("Woohoo! Caught the signal in audio\n");
-
-    for(i = 1; i < 10; i++)
-    	snd_pcm_writei(pcm_output_handle, i*2048+replayBuffer, blksize/BYTESPERFRAME);
-
+    replayFlag = 1;
 
     if( pSigPrev != NULL )
         (*pSigPrev)( sig );
@@ -75,7 +72,6 @@ void audio_signal_handler(int sig) {
 //*******************************************************************************
 void *audio_thread_fxn( void *envByRef )
 {
-
    // setup signal handler
    pSigPrev = signal( SIGUSR2, audio_signal_handler );
 
@@ -98,8 +94,10 @@ void *audio_thread_fxn( void *envByRef )
 //    FILE	* inputFile = NULL;		// Input file pointer (i.e. handle)
     snd_pcm_t	*pcm_capture_handle;		// Handle for the PCM device
     snd_pcm_uframes_t exact_bufsize;		// bufsize is in frames.  Each frame is 4 bytes
-
+    int   blksize = BLOCKSIZE;			// Raw input or output frame size in bytes
     char *outputBuffer = NULL;			// Output buffer for driver to read from
+
+    char replayBuffer[2048*BUFFER_MULT];
 
 // Thread Create Phase -- secure and initialize resources
 // ******************************************************
@@ -150,6 +148,9 @@ void *audio_thread_fxn( void *envByRef )
     // Record that the output buffer was allocated in initialization bitmask
     initMask |= OUTPUT_BUFFER_ALLOCATED;
 
+   //initialize ring buffer for replay
+   sfifo_init(&replayRingBuff, blksize*BUFFER_MULT);
+   memset(replayRingBuff.buffer, 0, replayRingBuff.size);
 
 // Thread Execute Phase -- perform I/O and processing
 // **************************************************
@@ -167,35 +168,49 @@ void *audio_thread_fxn( void *envByRef )
 // Processing loop
 //
     DBG( "Entering audio_thread_fxn processing loop\n" );
-
+    int j;
     int count = 0;
     while( !envPtr->quit )
     {
-	// populate the buffer with audio
-	if( snd_pcm_readi(pcm_capture_handle, outputBuffer, blksize/BYTESPERFRAME) < 0 )
-	{
-	    snd_pcm_prepare(pcm_capture_handle);
-	    ERR( "<<<<<<<<<<<<<<< Buffer Overrun >>>>>>>>>>>>>>>\n");
-	    ERR( "Error reading the data from file descriptor %d\n", (int) pcm_capture_handle );
-	    status = AUDIO_THREAD_FAILURE;
-	    goto  cleanup ;
-	}
 
-        // Write buffer into ALSA output device
-      while (snd_pcm_writei(pcm_output_handle, outputBuffer, blksize/BYTESPERFRAME) < 0) {
-        snd_pcm_prepare(pcm_output_handle);
-        ERR( "<<<<<<<<<<<<<<< Buffer Underrun >>>>>>>>>>>>>>>\n");
-//        status = AUDIO_THREAD_FAILURE;
-//        goto cleanup;
-	// Send out an extra blank buffer if there is an underrun and try again.
-	    memset(outputBuffer, 0, blksize);		// Clear the buffer
-	    snd_pcm_writei(pcm_output_handle, outputBuffer, exact_bufsize);
-      }
-	if(replayCounter == 10)
-		replayCounter = 0;
-	memcpy(replayBuffer+2048*replayCounter, outputBuffer, 2048);
-	replayCounter++;
-	
+	if(replayFlag == 1){ 	
+	    	for(j = 1; j < BUFFER_MULT; j++){
+			sfifo_read(&replayRingBuff, replayBuffer, blksize);
+			snd_pcm_writei(pcm_output_handle, replayBuffer, blksize/BYTESPERFRAME);
+	    		//snd_pcm_writei(pcm_output_handle, j*2048+replayBuffer, blksize/BYTESPERFRAME);
+			snd_pcm_readi(pcm_capture_handle, outputBuffer, blksize/BYTESPERFRAME);
+		}
+		replayFlag = 0;
+		sfifo_flush(&replayRingBuff);
+		DBG("Replayed audio\n");
+	}
+	else {
+		// populate the buffer with audio
+		if( snd_pcm_readi(pcm_capture_handle, outputBuffer, blksize/BYTESPERFRAME) < 0 )
+		{
+		    snd_pcm_prepare(pcm_capture_handle);
+		    ERR( "<<<<<<<<<<<<<<< Buffer Overrun >>>>>>>>>>>>>>>\n");
+		    ERR( "Error reading the data from file descriptor %d\n", (int) pcm_capture_handle );
+		    status = AUDIO_THREAD_FAILURE;
+		    goto  cleanup ;
+		}
+		//if(replayCounter == BUFFER_MULT)
+		//	replayCounter = 0;
+		//memcpy(replayBuffer+2048*replayCounter, outputBuffer, 2048);
+		sfifo_write(&replayRingBuff, outputBuffer, blksize); 
+		//replayCounter++;
+
+		// Write buffer into ALSA output device
+	      while (snd_pcm_writei(pcm_output_handle, outputBuffer, blksize/BYTESPERFRAME) < 0) {
+		snd_pcm_prepare(pcm_output_handle);
+		ERR( "<<<<<<<<<<<<<<< Buffer Underrun >>>>>>>>>>>>>>>\n");
+	//        status = AUDIO_THREAD_FAILURE;
+	//        goto cleanup;
+		// Send out an extra blank buffer if there is an underrun and try again.
+		    memset(outputBuffer, 0, blksize);		// Clear the buffer
+		    snd_pcm_writei(pcm_output_handle, outputBuffer, exact_bufsize);
+	      }
+	}
 	//DBG("%d, ", count++);
     }
     //DBG("\n");
@@ -233,6 +248,7 @@ cleanup:
     // Free allocated buffers
     // **********************
 
+    sfifo_close(&replayRingBuff);
     // Free output buffer
     if( initMask & OUTPUT_BUFFER_ALLOCATED )
     {
