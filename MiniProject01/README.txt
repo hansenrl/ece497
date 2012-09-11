@@ -5,7 +5,7 @@ Author: Ross Hansen
 
 The file mp1.c contains the miniproject main code. The file pwmLib.c contains helper libraries for PWMs. pwmTest is a test wrapper to easily use the pwm libraries for testing.
 
-mp1 turns on and off LEDs based off an interrupt-driven switch input. In one switch direction, the GPIO LED is off and the PWM LED blinks at a frequency of 3 Hz. In the other switch direction, the GPIO LED is turned on and the PWM LED changes frequency. In either switch configuration the duty cycle of the PWM LED is controlled by the analog input.
+mp1 turns on and off LEDs based off an interrupt-driven switch input. In one switch direction, the GPIO LED is off and the PWM LED blinks at a frequency of 3 Hz. In the other switch direction, the GPIO LED is turned on and the PWM LED changes frequency to 100 Hz. In either switch configuration the duty cycle of the PWM LED is controlled by the analog input.
 
 The switch is read as an interrupt, triggered on both rising and falling edges. Whenever an edge is triggered, in addition to the LED patterns changing, the I2C temperature sensor is read and the temperature is displayed.
 
