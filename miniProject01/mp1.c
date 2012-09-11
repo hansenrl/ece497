@@ -1,3 +1,26 @@
+/* mp1.c
+ * 
+ * Miniproject 1
+ * Author: Ross Hansen
+ *
+ * Turns on and off LEDs based off an interrupt-driven switch input,
+ * reads temperature data from i2c, and dims a flashing LED based on an analog input.
+ *
+ * --------------------------------------------------------------------------------------------
+ * Usage: mp1 <gpio-pin-switch> <gpio-pin-LED1> <i2c bus> <i2c addr> <pwm-num1> <pwm-num2> <anin-pin>
+ * --------------------------------------------------------------------------------------------
+ * 
+ * For example, the command "mp1 7 60 3 74 1 0 6" uses GPIO 7 for the switch,
+ * GPIO 60 for the LED, I2C bus 3, I2C address 74 (0x4a),
+ * ehrpwm.1:A for the pwm LED, and analog input 6 (ain6 in Linux)
+ *
+ * Requires the pwmLib.c library. Compile with gcc: "gcc mp1.c pwmLib.c -o mp1"
+ *
+ *
+ * GPIO source code based off of code from RidgeRun (see license information below)
+ *
+ */
+
 /* Copyright (c) 2011, RidgeRun
  * All rights reserved.
  *
@@ -44,14 +67,14 @@ From https://www.ridgerun.com/developer/wiki/index.php/Gpio-int-test.c
 #include <fcntl.h>
 
 // pwm libraries
-#include "pwmTest.h"
+#include "pwmLib.h"
 
  /****************************************************************
  * Constants
  ****************************************************************/
  
 #define SYSFS_GPIO_DIR "/sys/class/gpio"
-#define POLL_TIMEOUT (3 * 1000) /* 3 seconds */
+#define POLL_TIMEOUT (1 * 1000) /* 3 seconds */
 #define MAX_BUF 64
 
 /****************************************************************
@@ -66,6 +89,7 @@ int keepgoing = 1;	// Set to 0 when ctrl-c is pressed
 void signal_handler(int sig)
 {
 	printf( "Ctrl-C pressed, cleaning up and exiting..\n" );
+	pwm_stop(1, 0);
 	keepgoing = 0;
 }
 
@@ -307,24 +331,51 @@ int read_i2c(int i2cbus, int address){
 	return res;
 }
 
+int read_anin(int anin){
+	FILE *fp;
+	char fileName[60]; 
+	char readValue[5];
+
+	sprintf(fileName, "/sys/devices/platform/omap/tsc/ain%d", anin);
+
+	if ((fp = fopen(fileName,  "r")) == NULL) {
+		printf("Cannot open anin file: %s.\n", fileName);
+		exit(1);
+	}
+
+	//Set pointer to begining of the file
+	rewind(fp);
+	//Write our value of "out" to the file
+	fread(readValue, sizeof(char), 10, fp);
+	readValue[4] = '\0'; //for some reason when reading 4 digit numbers you get weird garbage after the value
+	//printf("anin: %s\n", readValue);
+	//fwrite(&setValue, sizeof(char), strlen(setValue), fp);
+	fclose(fp);
+
+	return atoi(readValue);
+}
+
 /****************************************************************
  * Main
  ****************************************************************/
 int main(int argc, char **argv, char **envp)
 {
 
-//USE ME: ./mp1 7 3 74
+//USE ME: ./mp1 7 60 3 74 1 0 6
 
 	struct pollfd fdset[2];
 	int nfds = 2;
-	int gpio_fd, timeout, rc, LED_fd;
+	int gpio_fd, timeout, rc, gpio_led;
 	char *buf[MAX_BUF];
 	unsigned int gpio;
-	int len;
+	int len, pot_input, pwm_num, pwm_letter, anin_pin;
 
-	if (argc < 4) {
-		printf("Usage: gpio-int <gpio-pin> <i2c bus> <i2c addr>\n\n");
-		printf("Waits for a change in the GPIO pin voltage level or input on stdin,\n blinks and LED on pin 60, and reads temp from i2c ");
+	if (argc < 8) {
+		printf("Usage: mp1 <gpio-pin-switch> <gpio-pin-LED1> <i2c bus> <i2c addr> <pwm-num1> <pwm-num2> <anin-pin>\n\n");
+		printf("For example, the command \"mp1 7 60 3 74 1 0 6\" uses GPIO 7 for the switch,\n"
+			"GPIO 60 for the LED, I2C bus 3, I2C address 74 (0x4a),\n"
+			"ehrpwm.1:A for the pwm LED, and analog input 6 (ain6 in Linux)\n\n");
+		printf("Turns on and off lights based off an interrupt-driven switch input,\nreads temp from i2c, and dims the flashing LED based on an analog input.\n\n");
 		exit(-1);
 	}
 
@@ -333,9 +384,17 @@ int main(int argc, char **argv, char **envp)
 	gpio = atoi(argv[1]);
 	gpio_fd = setup_gpio(gpio);
 
+	gpio_led = atoi(argv[2]);
+
+	pwm_num = atoi(argv[5]);
+	pwm_letter = atoi(argv[6]);
+	anin_pin = atoi(argv[7]);
+
 	timeout = POLL_TIMEOUT;
 
-	pwm_on(1,0,50,50);
+	if(pwm_on(pwm_num,pwm_letter,50,50) != 0){
+		printf("Something went wrong with the pwm's...probably the MUXing.\nIt may still work, but no gaurantees.\n");
+	}
  
 	while (keepgoing) {
 		memset((void*)fdset, 0, sizeof(fdset));
@@ -360,19 +419,16 @@ int main(int argc, char **argv, char **envp)
 		if (fdset[1].revents & POLLPRI) {
 			lseek(fdset[1].fd, 0, SEEK_SET);  // Read from the start of the file
 			len = read(fdset[1].fd, buf, MAX_BUF);
-			printf("\npoll() GPIO %d interrupt occurred, value=%c, len=%d\n",
-				 gpio, buf[0], len);
+			//printf("\npoll() GPIO %d interrupt occurred, value=%c, len=%d\n", gpio, buf[0], len);
 			if((unsigned int) buf[0] & 0x01 == 1){
-				gpio_set_value(60, 1);
-				pwm_update_frequency(1,0,2);
-				pwm_update_duty_cycle(1,0,20);
+				gpio_set_value(gpio_led, 1);
+				pwm_update_frequency(pwm_num,pwm_letter,100);
 			} else {
-				gpio_set_value(60, 0);
-				pwm_update_frequency(1,0,6);
-				pwm_update_duty_cycle(1,0,80);
+				gpio_set_value(gpio_led, 0);
+				pwm_update_frequency(pwm_num,pwm_letter,3);
 			}
 			
-			read_i2c(atoi(argv[2]),atoi(argv[3]));
+			read_i2c(atoi(argv[3]),atoi(argv[4]));
 			//printf("Set the value to %d", (unsigned int) buf[0]);
 		}
 
@@ -380,6 +436,11 @@ int main(int argc, char **argv, char **envp)
 			(void)read(fdset[0].fd, buf, 1);
 			printf("\npoll() stdin read 0x%2.2X\n", (unsigned int) buf[0]);
 		}
+
+		pot_input = read_anin(anin_pin);
+		//printf("Value from read_anin: %d\n", pot_input);
+		//pwm_update_frequency(1,0,100*pot_input/4100.0);
+		pwm_update_duty_cycle(pwm_num,pwm_letter,100*pot_input/4100.0);
 
 		fflush(stdout);
 	}
