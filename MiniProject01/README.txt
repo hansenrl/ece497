@@ -34,4 +34,4 @@ use an i2c device (read a temperature?)
 use at least one analog in (read a voltage?)
  - reads an analog voltage from a potentiometer to control duty cycle
 handle a ^C interrupt
- - stops the LED pwm and exits the program
+ - stops the LED PWM and exits the program
