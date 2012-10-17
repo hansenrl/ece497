@@ -65,18 +65,14 @@ By <i>Mark A. Yoder</i>
         plotTop,
         plotBot,
         ainData1 = [],  iain = 0, ainData2 = [], ainData3 = [],  
-        gpioData = [], igpio = 0,
-        i2cData = [],  ii2c = 0,
         gpioNum = 7,
 	ainNum3 = 7,
 	ainNum2 = 3,
-        ainNum1  = 1,
-        i2cNum  = "0x48";
-    ainData1[samples] = 0;
-    ainData2[samples] = 0;
-    ainData3[samples] = 0;
-    gpioData[samples] = 0;
-    i2cData[samples] = 0;
+        ainNum1  = 1;
+	ainData1[samples] = 0;
+	ainData2[samples] = 0;
+	ainData3[samples] = 0;
+
 
     function connect() {
       if(firstconnect) {
@@ -98,8 +94,6 @@ By <i>Mark A. Yoder</i>
         socket.on('ain1',  ain1);
 	socket.on('ain2', ain2);
 	socket.on('ain3', ain3);
-        socket.on('gpio', gpio);
-        socket.on('i2c',  i2c);
 
         firstconnect = false;
       }
@@ -147,33 +141,6 @@ By <i>Mark A. Yoder</i>
         plotTop.draw();
     }
 
-    function gpio(data) {
-        data = atob(data);
-//        status_update("gpio: " + data);
-        gpioData[igpio] = [igpio, data];
-        igpio++;
-        if(igpio >= samples) {
-            igpio = 0;
-            gpioData = [];
-        }
-        plotTop.setData([ ainData, gpioData ]);
-        plotTop.draw();
-    }
-
-    function i2c(data) {
-//        status_update("i2c: " + data);
-        // Convert to F
-        data = parseInt(data) / 16 / 16 * 9/5 +32;
-//        status_update("i2c: " + data);
-        i2cData[ii2c] = [ii2c, data];
-        ii2c++;
-        if(ii2c >= samples) {
-            ii2c = 0;
-            i2cData = [];
-        }
-        plotBot.setData([ i2cData ]);
-        plotBot.draw();
-    }
 
     function status_update(txt){
       document.getElementById('status').innerHTML = txt;
@@ -225,19 +192,6 @@ $(function () {
 	socket.emit('updateTimer', updateTopInterval);
     });
 
-    var updateBotInterval = 100;
-    $("#updateBotInterval").val(updateBotInterval).change(function () {
-        var v = $(this).val();
-        if (v && !isNaN(+v)) {
-            updateBotInterval = +v;
-            if (updateBotInterval < 25)
-                updateBotInterval = 25;
-            if (updateBotInterval > 2000)
-                updateBotInterval = 2000;
-            $(this).val("" + updateBotInterval);
-        }
-    });
-
     // setup plot
     var optionsTop = {
         series: { 
@@ -264,28 +218,6 @@ $(function () {
         ],
             optionsTop);
 
-    var optionsBot = {
-        series: { 
-            shadowSize: 0, // drawing is faster without shadows
-            points: { show: false},
-            lines:  { show: true, lineWidth: 5},
-            color: 2
-        }, 
-        yaxis:	{ min: 70, max: 90, 
-                  zoomRange: [10, 256], panRange: [60, 100] },
-        xaxis:	{ show: true, 
-                  zoomRange: [10, 100], panRange: [0, 100] },
-        legend:	{ position: "sw" },
-        zoom:	{ interactive: true, amount: 1.1 },
-        pan:	{ interactive: true }
-    };
-    /*plotBot = $.plot($("#plotBot"), 
-        [ 
-          { data:  initPlotData(),
-            label: "i2c"}
-        ],
-            optionsBot);
-*/
     // Request data every updateInterval ms
 /*    function updateTop() {
         socket.emit("ain1", ainNum1);
@@ -296,11 +228,6 @@ $(function () {
     }
     //updateTop();*/
 
-    function updateBot() {
-        socket.emit("i2c",  i2cNum);
-        setTimeout(updateBot, updateBotInterval);
-    }
-//    updateBot();
 });
 </script>
 

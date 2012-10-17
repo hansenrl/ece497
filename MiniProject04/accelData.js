@@ -45,8 +45,6 @@ server.listen(8081);
 var io = require('socket.io').listen(server);
 io.set('log level', 2);
 
-
-
 // on a 'connection' event
 io.sockets.on('connection', function (socket) {
     var frameCount = 0;	// Counts the frames from arecord
@@ -68,7 +66,7 @@ io.sockets.on('connection', function (socket) {
 //        }
 //    }
     // Make sure gpio 7 is available.
-    exec("echo 7 > /sys/class/gpio/export");
+    //exec("echo 7 > /sys/class/gpio/export");
 
     var ainNum1 = 1;
     var ainNum2 = 3;
