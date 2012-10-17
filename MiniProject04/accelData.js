@@ -69,14 +69,33 @@ io.sockets.on('connection', function (socket) {
     
 
     // Send value every time a 'message' is received.
-    socket.on('ain', function (ainNum) {
+    socket.on('ain1', function (ainNum) {
 //        var ainPath = "/sys/devices/platform/omap/tsc/ain" + ainNum;
         fs.readFile(ainPath + "ain" + ainNum, 'base64', function(err, data) {
             if(err) throw err;
-            socket.emit('ain', [data.substr(0,4),1]);
-            console.log('emitted ain: ' + data.substr(0,4));
+            socket.emit('ain1', data.substr(0,4));
+//            console.log('emitted ain1: ' + data.substr(0,4));
         });
     });
+
+    socket.on('ain2', function (ainNum) {
+//        var ainPath = "/sys/devices/platform/omap/tsc/ain" + ainNum;
+        fs.readFile(ainPath + "ain" + ainNum, 'base64', function(err, data) {
+            if(err) throw err;
+            socket.emit('ain2', data.substr(0,4));
+//            console.log('emitted ain2: ' + data.substr(0,4));
+        });
+    });
+
+    socket.on('ain3', function (ainNum) {
+//        var ainPath = "/sys/devices/platform/omap/tsc/ain" + ainNum;
+        fs.readFile(ainPath + "ain" + ainNum, 'base64', function(err, data) {
+            if(err) throw err;
+            socket.emit('ain3', data.substr(0,4));
+//            console.log('emitted ain3: ' + data.substr(0,4));
+        });
+    });
+
 
     socket.on('gpio', function (gpioNum) {
         var gpioPath = "/sys/class/gpio/gpio" + gpioNum + "/value";
