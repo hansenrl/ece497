@@ -17,9 +17,9 @@
     <button id="connect" onClick='connect()'/>Connect</button>
     <button id="disconnect" onClick='disconnect()'>Disconnect</button>
     <span style="position:relative; left:150px">
-    Analog: <input id="ainNum" type="text" value="" style="text-align: right; width:2em">
-    gpio: <input id="gpioNum" type="text" value="" style="text-align: right; width:2em">
-    i2c: <input id="i2cNum" type="text" value="" style="text-align: right; width:3em">
+    Analog 1 (Z): <input id="ainNum1" type="text" value="" style="text-align: right; width:2em">
+    Analog 2 (Y): <input id="ainNum2" type="text" value="" style="text-align: right; width:2em">
+    Analog 3 (X): <input id="ainNum3" type="text" value="" style="text-align: right; width:3em">
     </span>
 <!--    <button id="send" onClick='send()'/>Send Message</button> -->
 <table>
@@ -196,16 +196,19 @@ $(function () {
     }
 
     // setup control widget
-    $("#ainNum").val(ainNum1).change(function () {
-        ainNum = $(this).val();
+    $("#ainNum1").val(ainNum1).change(function () {
+        ainNum1 = $(this).val();
+	socket.emit("updateain1", ainNum1);
     });
 
-    $("#gpioNum").val(gpioNum).change(function () {
-        gpioNum = $(this).val();
+    $("#ainNum2").val(ainNum2).change(function () {
+        ainNum2 = $(this).val();
+	socket.emit("updateain2", ainNum2);
     });
 
-    $("#i2cNum").val(i2cNum).change(function () {
-        i2cNum = $(this).val();
+    $("#ainNum3").val(ainNum3).change(function () {
+        ainNum3 = $(this).val();
+	socket.emit("updateain3", ainNum3);
     });
 
     var updateTopInterval = 100;
@@ -219,6 +222,7 @@ $(function () {
                 updateTopInterval = 2000;
             $(this).val("" + updateTopInterval);
         }
+	socket.emit('updateTimer', updateTopInterval);
     });
 
     var updateBotInterval = 100;
@@ -283,14 +287,14 @@ $(function () {
             optionsBot);
 */
     // Request data every updateInterval ms
-    function updateTop() {
+/*    function updateTop() {
         socket.emit("ain1", ainNum1);
 	socket.emit("ain2", ainNum2);
 	socket.emit("ain3", ainNum3);
        // socket.emit("gpio", gpioNum);
         setTimeout(updateTop, updateTopInterval);
     }
-    updateTop();
+    //updateTop();*/
 
     function updateBot() {
         socket.emit("i2c",  i2cNum);

@@ -45,6 +45,8 @@ server.listen(8081);
 var io = require('socket.io').listen(server);
 io.set('log level', 2);
 
+
+
 // on a 'connection' event
 io.sockets.on('connection', function (socket) {
     var frameCount = 0;	// Counts the frames from arecord
@@ -58,6 +60,7 @@ io.sockets.on('connection', function (socket) {
     // Make sure some needed files are there
     // The path to the analog devices changed from A5 to A6.  Check both.
     var ainPath = "/sys/devices/platform/omap/tsc/";
+    
 //    if(!fs.existsSync(ainPath)) {
 //        ainPath = "/sys/devices/platform/tsc/";
 //        if(!fs.existsSync(ainPath)) {
@@ -66,8 +69,53 @@ io.sockets.on('connection', function (socket) {
 //    }
     // Make sure gpio 7 is available.
     exec("echo 7 > /sys/class/gpio/export");
-    
 
+    var ainNum1 = 1;
+    var ainNum2 = 3;
+    var ainNum3 = 7;
+    var pushInterval = 100;
+
+    function pushData() {
+	fs.readFile(ainPath + "ain" + ainNum1, 'base64', function(err, data) {
+    	    if(err) throw err;
+	    socket.emit('ain1', data.substr(0,4));
+//	    console.log('emitted ain1: ' + data.substr(0,4));
+	});
+
+	fs.readFile(ainPath + "ain" + ainNum2, 'base64', function(err, data) {
+	    if(err) throw err;
+	    socket.emit('ain2', data.substr(0,4));
+//            console.log('emitted ain2: ' + data.substr(0,4));
+	});
+
+	fs.readFile(ainPath + "ain" + ainNum3, 'base64', function(err, data) {
+	    if(err) throw err;
+	    socket.emit('ain3', data.substr(0,4));
+	//            console.log('emitted ain3: ' + data.substr(0,4));
+	});
+	setTimeout(pushData, pushInterval);
+    }
+
+    socket.on('updateain1', function (ainNum) {
+	ainNum1 = ainNum;
+	//console.log('Updated ainNum1: ' + ainNum1);
+    });
+
+    socket.on('updateain2', function (ainNum) {
+	ainNum2 = ainNum;
+	//console.log('Updated ainNum2: ' + ainNum1);
+    });
+
+    socket.on('updateain3', function (ainNum) {
+	ainNum3 = ainNum;
+	//console.log('Updated ainNum3: ' + ainNum1);
+    });
+
+    socket.on('updateTimer', function (timer) {
+	pushInterval = timer;
+	console.log('New push interval: ' + pushInterval);
+    });
+/*
     // Send value every time a 'message' is received.
     socket.on('ain1', function (ainNum) {
 //        var ainPath = "/sys/devices/platform/omap/tsc/ain" + ainNum;
@@ -77,59 +125,7 @@ io.sockets.on('connection', function (socket) {
 //            console.log('emitted ain1: ' + data.substr(0,4));
         });
     });
-
-    socket.on('ain2', function (ainNum) {
-//        var ainPath = "/sys/devices/platform/omap/tsc/ain" + ainNum;
-        fs.readFile(ainPath + "ain" + ainNum, 'base64', function(err, data) {
-            if(err) throw err;
-            socket.emit('ain2', data.substr(0,4));
-//            console.log('emitted ain2: ' + data.substr(0,4));
-        });
-    });
-
-    socket.on('ain3', function (ainNum) {
-//        var ainPath = "/sys/devices/platform/omap/tsc/ain" + ainNum;
-        fs.readFile(ainPath + "ain" + ainNum, 'base64', function(err, data) {
-            if(err) throw err;
-            socket.emit('ain3', data.substr(0,4));
-//            console.log('emitted ain3: ' + data.substr(0,4));
-        });
-    });
-
-
-    socket.on('gpio', function (gpioNum) {
-        var gpioPath = "/sys/class/gpio/gpio" + gpioNum + "/value";
-        fs.readFile(gpioPath, 'base64', function(err, data) {
-            if (err) throw err;
-            socket.emit('gpio', data);
-//            console.log('emitted gpio: ' + data);
-        });
-    });
-
-    socket.on('i2c', function (i2cNum) {
-//        console.log('Got i2c request:' + i2cNum);
-        exec('i2cget -y 3 ' + i2cNum + ' 0 w',
-            function (error, stdout, stderr) {
-//		The TMP102 returns a 12 bit value with the digits swapped
-                stdout = '0x' + stdout.substring(4,6) + stdout.substring(2,4);
-//                console.log('i2cget: "' + stdout + '"');
-                if(error) { console.log('error: ' + error); }
-                if(stderr) {console.log('stderr: ' + stderr); }
-                socket.emit('i2c', stdout);
-            });
-    });
-
-    socket.on('led', function (ledNum) {
-        var ledPath = "/sys/class/leds/beaglebone::usr" + ledNum + "/brightness";
-//        console.log('LED: ' + ledPath);
-        fs.readFile(ledPath, 'utf8', function (err, data) {
-            if(err) throw err;
-            data = data.substring(0,1) === "1" ? "0" : "1";
-//            console.log("LED%d: %s", ledNum, data);
-            fs.writeFile(ledPath, data);
-        });
-    });
-
+*/
     socket.on('disconnect', function () {
         console.log("Connection " + socket.id + " terminated.");
         connectCount--;
@@ -140,5 +136,7 @@ io.sockets.on('connection', function (socket) {
 
     connectCount++;
     console.log("connectCount = " + connectCount);
+
+    pushData();
 });
 
